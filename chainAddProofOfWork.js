@@ -4,14 +4,37 @@ class Block {
   constructor(data, previousHash) {
     this.data = data;
     this.previousHash = previousHash;
+    this.nonce = 1; //随机数--用来动态计算区块hash的值以满足区块立链的难度要求
     this.hash = this.computeHash();
   }
   computeHash() {
-    return sha256(this.data + this.previousHash).toString();
+    return sha256(this.data + this.previousHash + this.nonce).toString();
+  }
+  //获得区块链的工作证明答案
+  getAnswer(diifficulty) {
+    let answer = "";
+    for (let i = 1; i <= diifficulty; i++) {
+      answer += "0";
+    }
+    return answer;
+  }
+  //开始挖矿--计算符合区块链要求难度的hash
+  mine(diifficulty) {
+    while (true) {
+      this.hash = this.computeHash();
+      if (this.hash.substring(0, diifficulty) !== this.getAnswer(diifficulty)) {
+        this.nonce++;
+        this.hash = this.computeHash();
+      } else {
+        break;
+      }
+    }
+    console.log("挖矿结束", this.hash);
   }
 }
 class Chain {
   constructor() {
+    this.diifficulty = 2;
     this.chain = [this.bigBang()];
   }
   bigBang() {
@@ -48,17 +71,25 @@ class Chain {
   addBlockToChain(newBlock) {
     newBlock.previousHash = this.getLatestBlock().hash;
     newBlock.hash = newBlock.computeHash();
+    //设置添加区块的条件--满足区块链的difficulty
+    newBlock.mine(this.diifficulty);
     this.chain.push(newBlock);
   }
 }
 const gxchain = new Chain();
 const block1 = new Block("转账10元", "");
+const block2 = new Block("转账100元", "");
 gxchain.addBlockToChain(block1);
+gxchain.addBlockToChain(block2);
 console.log(gxchain);
 console.log(gxchain.validateChain());
-gxchain.chain[0].data = "我不是祖先区块";
+gxchain.chain[0].mine(2);
+gxchain.chain[1].data = "转账10个10元";
 console.log(gxchain);
 console.log(gxchain.validateChain());
+// gxchain.chain[0].data = "我不是祖先区块";
+// console.log(gxchain);
+// console.log(gxchain.validateChain());
 // gxchain.chain[1].data = "转账100元";
 // console.log(gxchain);
 // console.log(gxchain.validateChain());
