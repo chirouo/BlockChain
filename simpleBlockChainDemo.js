@@ -1,4 +1,6 @@
 const sha256 = require("crypto-js/sha256");
+const ecLib = require("elliptic").ec;
+const ec = new ecLib("secp256k1");
 //需要一个Block Chain
 class Block {
   constructor(data, previousHash) {

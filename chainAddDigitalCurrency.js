@@ -1,11 +1,24 @@
 //use the transaction replace the data of block
 const sha256 = require("crypto-js/sha256");
+const ecLib = require("elliptic").ec;
+const ec = new ecLib("secp256k1");
 //需要一个Block Chain
 class Transaction {
   constructor(from, to, amount) {
     this.from = from;
     this.to = to;
     this.amount == amount;
+  }
+  computeHash() {
+    return sha256(this.from + this.to + this.amount).toString();
+  }
+  sign(key) {
+    this.signature = key.sign(this.computeHash(), "base64").toDER("hex");
+  }
+  isValid() {
+    if (this.from == "") return true;
+    const keyObj = ec.keyFromPublic(this.from, "hex");
+    return keyObj.verify(this.computeHash(), this.signature);
   }
 }
 class Block {
@@ -29,8 +42,18 @@ class Block {
     }
     return answer;
   }
+  validateBlockTransactions() {
+    for (let transaction of this.transactions) {
+      if (!transaction.isValid()) {
+        console.log("invalid transaction found in transactions,发现异常交易");
+        return false;
+      }
+    }
+    return true;
+  }
   //开始挖矿--计算符合区块链要求难度的hash
   mine(difficulty) {
+    this.validateBlockTransactions();
     while (true) {
       this.hash = this.computeHash();
       if (this.hash.substring(0, difficulty) !== this.getAnswer(difficulty)) {
@@ -55,6 +78,9 @@ class Chain {
     return genesisBlock;
   }
   addTransaction(transaction) {
+    if (!transaction.isValid()) {
+      throw new Error("交易被修改了");
+    }
     this.transactionsPool.push(transaction);
   }
   mineTransactionPool(rewardAddress) {
@@ -85,6 +111,10 @@ class Chain {
     //如果链的长度不为1，那么从第二开始检验,这里祖先区块的数据检验放在for循环里的最后一个if里面了
     for (let i = 1; i <= this.chain.length - 1; i++) {
       const blockToValidate = this.chain[i];
+      if (!blockToValidate.validateBlockTransactions()) {
+        console.log("有非法交易");
+        return false;
+      }
       if (blockToValidate.hash !== blockToValidate.computeHash()) {
         console.log("数据被篡改了");
         return false;
@@ -126,11 +156,21 @@ class Chain {
 // console.log(gxchain);
 // console.log(gxchain.validateChain());
 const gxChain = new Chain(5);
+const keyPairSender = ec.genKeyPair();
+const privateKeySender = keyPairSender.getPrivate("hex");
+const publicKeySender = keyPairSender.getPublic("hex");
+
+const keyPairReceiver = ec.genKeyPair();
+const privateKeyReceiver = keyPairReceiver.getPrivate("hex");
+const publicKeyReceiver = keyPairReceiver.getPublic("hex");
+
 console.log(gxChain);
-const transaction1 = new Transaction("addr1", "100元");
-const transaction2 = new Transaction("addr2", "1000元");
-gxChain.addTransaction(transaction1);
-gxChain.addTransaction(transaction2);
-gxChain.mineTransactionPool("addr1");
-console.log(gxChain);
+const transaction1 = new Transaction(publicKeySender, publicKeyReceiver, 10);
+// const transaction2 = new Transaction("addr2", "1000元");
+// gxChain.addTransaction(transaction1);
+// gxChain.addTransaction(transaction2);
+// gxChain.mineTransactionPool("addr1");
+transaction1.sign(keyPairSender);
+console.log(transaction1);
+console.log(transaction1.isValid());
 // console.log(JSON.stringify(gxChain.chain[1].transactions));
